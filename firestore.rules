@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: events
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required)
+    //   - description: string (required)
+    //   - date: string (required, ISO 8601)
+    //   - location: string (required)
+    //   - totalSeats: number (required)
+    //   - availableSeats: number (required)
+    //   - price: number (required)
+    //   - creatorId: string (required)
+    //   - imageUrl: string (optional)
+    //
+    // Collection: bookings
+    // Document ID: auto-generated
+    // Fields:
+    //   - eventId: string (required)
+    //   - userId: string (required)
+    //   - userName: string (required)
+    //   - seatsBooked: number (required)
+    //   - timestamp: string (required, ISO 8601)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "roghanjenith0304@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll(['title', 'description', 'date', 'location', 'totalSeats', 'availableSeats', 'price', 'creatorId']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.description is string && data.description.size() < 1000 &&
+             data.location is string && data.location.size() < 200 &&
+             data.totalSeats is int && data.totalSeats > 0 &&
+             data.availableSeats is int && data.availableSeats >= 0 && data.availableSeats <= data.totalSeats &&
+             data.price is number && data.price >= 0 &&
+             data.creatorId == request.auth.uid;
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['eventId', 'userId', 'userName', 'seatsBooked', 'timestamp']) &&
+             data.eventId is string &&
+             data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() > 0 &&
+             data.seatsBooked is int && data.seatsBooked > 0 && data.seatsBooked <= 10;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidEvent(request.resource.data);
+      allow update: if isAuthenticated() && (
+        // Creator can update everything
+        (request.auth.uid == resource.data.creatorId && isValidEvent(request.resource.data)) ||
+        // Any user can update availableSeats during booking (atomic increment/decrement)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availableSeats']) &&
+         request.resource.data.availableSeats is int &&
+         request.resource.data.availableSeats >= 0)
+      );
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.creatorId || isAdmin());
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && isValidBooking(request.resource.data);
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+  }
+}

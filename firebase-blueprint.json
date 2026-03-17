@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "Event": {
+      "title": "Event",
+      "description": "Represents a scheduled event that users can book.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The name of the event." },
+        "description": { "type": "string", "description": "A detailed description of the event." },
+        "date": { "type": "string", "format": "date-time", "description": "When the event takes place." },
+        "location": { "type": "string", "description": "Where the event is held." },
+        "totalSeats": { "type": "integer", "description": "Maximum capacity of the event." },
+        "availableSeats": { "type": "integer", "description": "Remaining seats available for booking." },
+        "price": { "type": "number", "description": "Cost per seat." },
+        "creatorId": { "type": "string", "description": "The UID of the user who created the event." },
+        "imageUrl": { "type": "string", "description": "Optional image for the event." }
+      },
+      "required": ["title", "date", "location", "totalSeats", "availableSeats", "price", "creatorId"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Represents a seat reservation made by a user.",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string", "description": "The ID of the event booked." },
+        "userId": { "type": "string", "description": "The UID of the user who made the booking." },
+        "userName": { "type": "string", "description": "The name of the user who made the booking." },
+        "seatsBooked": { "type": "integer", "description": "Number of seats reserved." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the booking was made." }
+      },
+      "required": ["eventId", "userId", "seatsBooked", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/events/{eventId}": {
+      "schema": "Event",
+      "description": "Collection of all available events."
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Collection of all user bookings."
+    }
+  }
+}
